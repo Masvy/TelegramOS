@@ -1,17 +1,21 @@
+import os
 import asyncio
 
 from environs import Env
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from sqlalchemy.orm import sessionmaker
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import default_state
-from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, and_f, StateFilter
+from aiogram.types import Message, CallbackQuery, FSInputFile
 
 from filters.admin_filters import IsAdmin
 from states.admin_states import InputNews
+from utils.excel_file import generate_excel_file
 from keyboards.inline_admib import admin_kb
-from database.users import number_registered, count_user_ids
+from database.users import number_registered, count_user_ids, show_user_ids, \
+    show_first_names, show_user_names, \
+    show_registration_date
 
 admin_router: Router = Router()
 
@@ -61,3 +65,23 @@ async def show_statistics(callback: CallbackQuery,
                           session_maker: sessionmaker):
     registered = await number_registered(session_maker=session_maker)
     await callback.message.answer(f'Registered: {registered}')
+
+
+@admin_router.callback_query(F.data == 'view_database_pressed')
+async def show_users(callback: CallbackQuery,
+                     session_maker: sessionmaker,
+                     bot: Bot):
+    show_user_ids_ = await show_user_ids(session_maker=session_maker)
+    show_first_names_ = await show_first_names(session_maker=session_maker)
+    show_user_names_ = await show_user_names(session_maker=session_maker)
+    show_registration_date_ = await show_registration_date(session_maker=session_maker)
+    excel_file = await generate_excel_file(show_user_ids_, show_first_names_,
+                                           show_user_names_, show_registration_date_)
+
+    temp_file_path = "temp_user_database.xlsx"
+    with open(temp_file_path, "wb") as temp_file:
+        temp_file.write(excel_file.read())
+
+    await bot.send_document(callback.from_user.id,
+                            document=FSInputFile(temp_file_path))
+    os.remove(temp_file_path)

@@ -6,7 +6,7 @@ from aiogram import Router, F, Bot
 from sqlalchemy.orm import sessionmaker
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import default_state
-from aiogram.filters import CommandStart, and_f, StateFilter
+from aiogram.filters import CommandStart, and_f, StateFilter, Command
 from aiogram.types import Message, CallbackQuery, FSInputFile
 
 from filters.admin_filters import IsAdmin
@@ -29,11 +29,18 @@ async def start_bot_admin(message: Message):
                          reply_markup=admin_kb)
 
 
+@admin_router.message(Command(commands='cancel'), ~StateFilter(default_state))
+async def process_cancel_command_state(message: Message, state: FSMContext):
+    await message.answer(text='mailing canceled')
+    await state.clear()
+
+
 @admin_router.callback_query(F.data == 'mailing_list_pressed',
                              StateFilter(default_state))
 async def request_mailing(callback: CallbackQuery,
                           state: FSMContext):
-    await callback.message.answer('Submit content')
+    await callback.message.answer('Submit content\n\nIf you want to cancel'
+                                  'the mailing, then click on /cancel')
     await state.set_state(InputNews.news)
 
 
